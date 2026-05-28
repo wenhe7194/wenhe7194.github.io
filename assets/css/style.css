@@ -60,6 +60,21 @@ nav a:hover {
     margin-bottom: 12px;
 }
 
+.article-date,
+.post-meta {
+    color: #777;
+    font-size: 14px;
+}
+
+.article-date {
+    margin-left: 8px;
+}
+
+.article-summary {
+    margin: 4px 0 0;
+    color: #555;
+}
+
 a {
     color: #0969da;
 }
