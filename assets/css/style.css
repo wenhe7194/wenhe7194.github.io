@@ -52,6 +52,11 @@ nav a:hover {
     margin-top: 0;
 }
 
+.card h3 {
+    font-size: 20px;
+    margin: 28px 0 8px;
+}
+
 .article-list {
     padding-left: 20px;
 }

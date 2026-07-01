@@ -121,7 +121,11 @@ def markdown_to_html(markdown: str) -> str:
             blocks.append(f'<figure class="post-figure">\n    <img src="{src}" alt="{alt}" loading="lazy">{caption_html}\n</figure>')
             continue
 
-        if stripped.startswith("## "):
+        if stripped.startswith("### "):
+            flush_paragraph()
+            flush_list()
+            blocks.append(f"<h3>{markdown_inline(stripped[4:])}</h3>")
+        elif stripped.startswith("## "):
             flush_paragraph()
             flush_list()
             blocks.append(f"<h2>{markdown_inline(stripped[3:])}</h2>")

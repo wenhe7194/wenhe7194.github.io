@@ -22,46 +22,355 @@ summary: 记录参与 Triton 共性前端和硬件后端适配项目后，对 AI
 
 也就是说，AI Infra 不是模型本身，也不是某一块具体硬件，而是让模型可以被部署、服务、优化、观测和维护的系统工程层。
 
-这些算子真正落到硬件上执行之前，可以进一步抽象成这样的流程：
+这一部分我们重点研究的是编译优化与算子运行层。高性能算子通常有两类实现思路：一种是直接编写 CUDA 高性能代码，从算法和硬件特性出发，手动设计访存方式、并行粒度、线程映射和数据布局；另一种是通过 AI 编译器自动生成、优化或转换算子代码，把优化逻辑沉淀到编译流程、IR 表达和后端适配中。
+
+这两种方式各有优势。手写 CUDA 的优势在于控制力强，开发者可以针对具体算子、具体硬件和具体数据规模做非常细致的优化，往往更容易逼近单个场景下的性能上限；但它的缺点也很明显：开发门槛高、调试成本高、可移植性弱，一旦算子形态、输入规模或硬件平台发生变化，很多优化都需要重新设计。
+
+AI 编译器的优势则在于复用性和自动化。它希望把常见的优化策略抽象到编译器系统中，通过 IR、调度规则和后端代码生成，让更多算子和更多硬件共享同一套优化基础设施。这种方式可以降低高性能算子开发的门槛，也更适合面对模型结构快速变化、硬件平台多样化的 AI Infra 场景。不过，编译器生成代码也并不意味着一定能超过手写 CUDA：它依赖编译器对算子语义、硬件特性和调度空间的建模能力，在极致性能、特殊算子或复杂边界条件下，仍然可能需要人工介入和针对性优化。
+
+因此，AI Infra 与传统 HPC 的交叉点并不是简单地用编译器替代手写优化，而是把 HPC 中对计算模式和硬件细节的理解，进一步系统化地沉淀到编译器基础设施中。手写 CUDA 更像是面向具体问题的精细优化，AI 编译器则更强调把这些优化经验变成可复用、可迁移、可扩展的系统能力。
+
+## 2. 从 Kernel 算子理解推理优化
+
+在 AI Infra 和 AI 编译器中，算子是连接模型表达、编译器优化和硬件执行的核心单位。深度学习框架中通常使用 operator 描述高层计算，例如 `torch.add`、`torch.mm`、`torch.softmax`；而在编译器和硬件执行层面，更关注 kernel，也就是某个算子在具体硬件上的执行实现。
+
+同一个 operator 在不同 shape、dtype、硬件后端和调度策略下，可能会对应不同的 kernel。推理优化通常不是只看完整模型，而是需要拆解模型中高频出现的基础算子，分析它们的计算模式、访存模式、数值稳定性和可融合性。
+
+常见推理算子可以大致分为几类：
+
+- Elementwise：代表算子包括 add、bias、activation，优化重点是减少访存和算子融合。
+- Matrix Compute：代表算子包括 GEMM、QK^T、PV，优化重点是 tiling、矩阵计算单元和数据复用。
+- Reduction：代表算子包括 softmax、layernorm、RMSNorm，优化重点是并行归约和数值稳定。
+- Attention-specific：代表算子包括 RoPE、FlashAttention、KV cache，优化重点是分块、融合和减少 HBM 访问。
+- Generation：代表算子包括 top-k、sampling，优化重点是降低逐 token 延迟。
+
+### 2.1 Add：最基础的 Elementwise 算子
+
+Add 是逐元素加法，最简单的形式是：
 
 ```text
-模型 / 高层算子
-    ↓
-算子实现，例如 Triton kernel
-    ↓
-中间表示 IR
-    ↓
-编译器 Pass 优化和转换
-    ↓
-后端相关 IR 或代码
-    ↓
-硬件执行
+C[i] = A[i] + B[i]
 ```
 
-与CUDA高性能代码，也就是直接从算法和硬件特性出发，思考如何组织访存、并行度、线程映射和数据布局。这个项目让我开始理解另一种方式：通过编译器系统自动生成、优化或转换高性能代码。
+如果涉及 broadcasting，也可能是：
 
-这也是 AI Infra 和传统 HPC 很重要的交叉点。HPC 更强调对计算和硬件的细粒度理解，而 AI 编译器希望把这些优化经验沉淀到编译流程、IR 表达和后端适配中，让更多算子和更多硬件可以复用同一套基础设施。
+```text
+C[i, j] = A[i, j] + B[j]
+```
 
-## 2. 我对 kernel 和算子的理解
+Add 在 Transformer 推理中非常常见，例如：
 
-在这个项目里，我接触到的基准 kernel 主要包括：
+- residual connection：`x + attention(x)`
+- bias add：`matmul(x, w) + bias`
+- attention mask：`attention_score + attention_mask`
+- embedding add：`token_embedding + position_embedding`
 
-- add
-- GEMM / matmul
-- softmax
-- layernorm
+Add 的计算量很小，通常不是 compute-bound，而是 memory-bound。也就是说，性能瓶颈主要来自内存读写，而不是加法本身。一个普通 add kernel 至少需要读取两个输入 tensor，再写回一个输出 tensor。
 
-这些 kernel 不是随便选的，而是推理系统中非常典型的基础算子。
+常见优化方向包括：
 
-add 是 elementwise 算子，主要考察逐元素计算和基础访存。它看起来简单，但适合作为最小闭环，用来验证前端表达、编译链路、后端接入和运行时调用是否顺畅。
+- 保证输入输出连续，提升内存访问效率
+- 使用向量化 load/store，一次处理多个元素
+- 优化 broadcasting，避免重复加载小张量
+- 与 bias、activation、residual 等 elementwise 操作融合
+- 减少中间 tensor 写回
 
-GEMM 是矩阵乘法，也是大模型中最核心的计算密集型算子。线性层、注意力投影、MLP 等模块都会大量依赖 GEMM，因此它通常最能反映硬件计算能力、内存层级利用率和编译器优化质量。
+Add 虽然数学上简单，但在编译器项目中非常适合作为最小闭环测试。它可以验证从高层算子入口到 IR 生成、Pass pipeline、后端 lowering 和运行时执行的基础链路是否打通。
 
-softmax 常用于 attention 计算。它不仅包含指数和归一化，还涉及数值稳定性问题，例如需要先减去最大值再做指数计算。它让我意识到，算子优化并不是只看吞吐，也要保证数学语义和数值行为正确。
+### 2.2 GEMM / Matmul：推理中的核心计算密集型算子
 
-layernorm 是 Transformer 中非常常见的归一化算子，涉及均值、方差、缩放和平移。它的计算模式和 GEMM 不同，更能体现访存、归约和小规模并行组织上的问题。
+GEMM 是通用矩阵乘法，形式为：
 
-通过这几个 kernel，我开始理解 AI 推理优化并不是只优化一个模型，而是要理解模型中高频出现的基础算子，以及这些算子在编译器和硬件上的表现。
+```text
+C = A x B
+```
+
+展开后是：
+
+```text
+C[i, j] = sum(A[i, k] * B[k, j])
+```
+
+其中：
+
+- A: `[M, K]`
+- B: `[K, N]`
+- C: `[M, N]`
+
+GEMM 是 Transformer 推理中最重要的计算之一。大量线性层本质上都是矩阵乘法，例如：
+
+- `Q = XWq`
+- `K = XWk`
+- `V = XWv`
+- `O = Attention(Q, K, V)Wo`
+- MLP 中的 up projection / down projection
+- hidden states 到 vocabulary logits 的投影
+
+Attention 中的 `QK^T` 和 `softmax(QK^T)V` 本质上也可以视为矩阵乘法。
+
+GEMM 通常是 compute-bound 算子，尤其在矩阵规模较大时，性能主要取决于硬件矩阵计算单元的利用率。常见优化方向包括：
+
+- tiling：将大矩阵切成小块
+- blocking：让 tile 数据尽量驻留在 cache / shared memory / local memory 中
+- data reuse：提高 A、B tile 的复用率
+- 使用 Tensor Core / NPU / TPU 矩阵单元
+- fp16 / bf16 输入，fp32 accumulation
+- 调整 layout，减少转置和非连续访问
+- matmul + bias + activation 融合
+- int8 / int4 量化 GEMM
+
+GEMM 是检验编译器和后端能力的重要算子。它不仅要求正确 lowering 矩阵乘法，还要求能生成适合硬件矩阵单元的高效代码。
+
+### 2.3 Softmax：Attention 中的数值稳定归一化
+
+Softmax 用于将一组分数转换为概率分布：
+
+```text
+softmax(x_i) = exp(x_i) / sum(exp(x_j))
+```
+
+实际实现中通常使用数值稳定版本：
+
+```text
+m = max(x)
+softmax(x_i) = exp(x_i - m) / sum(exp(x_j - m))
+```
+
+减去最大值不会改变 softmax 的数学结果，但可以避免 `exp(x)` 溢出。
+
+Softmax 最典型的使用位置是 attention：
+
+```text
+score = QK^T / sqrt(d)
+prob = softmax(score)
+output = prob x V
+```
+
+Softmax 的计算模式通常包含：
+
+- max reduction
+- subtract max
+- exp
+- sum reduction
+- divide by sum
+
+因此它既包含归约，也包含 elementwise 操作。优化方向包括：
+
+- 高效并行归约 max 和 sum
+- 减少中间结果写回全局内存
+- 保证数值稳定性
+- 优化 attention mask 处理
+- 使用近似 exp 或硬件 exp 指令
+- 与 attention 融合，减少 score / prob 中间矩阵写回
+
+FlashAttention 是 softmax 相关优化的典型代表。其核心思想是分块计算 attention，并使用 online softmax 维护局部和全局归一化信息，从而避免显式保存完整 attention score 矩阵，大幅减少 HBM 访问。
+
+### 2.4 LayerNorm：Transformer 中的高频归一化算子
+
+LayerNorm 的公式为：
+
+```text
+mean = sum(x) / N
+var = sum((x - mean)^2) / N
+y = (x - mean) / sqrt(var + eps) * gamma + beta
+```
+
+其中：
+
+- gamma：缩放参数
+- beta：平移参数
+- eps：防止除零
+
+LayerNorm 在 Transformer 中非常常见，例如：
+
+- layernorm -> attention
+- residual add -> layernorm
+- layernorm -> MLP
+
+LayerNorm 的计算模式是 reduction + elementwise。它需要先计算均值和方差，再对每个元素做归一化、缩放和平移。相比 GEMM，它的计算密度较低，更容易受到访存、归约效率和 kernel launch 开销影响。
+
+常见优化方向包括：
+
+- 高效计算 mean 和 variance
+- 使用 fp32 accumulation 保证统计稳定性
+- 向量化 hidden dimension 的读取和写回
+- 减少中间 buffer
+- residual add + layernorm 融合
+- bias + layernorm 融合
+- 针对固定 hidden size 做特化 kernel
+
+LayerNorm 代表了一类不同于 GEMM 的优化问题：它不是为了吃满矩阵计算单元，而是要减少访存、降低归约开销，并提升小规模并行效率。
+
+### 2.5 RMSNorm：LayerNorm 的常见替代
+
+RMSNorm 是 Root Mean Square Normalization。它不计算均值，只基于均方根做归一化：
+
+```text
+rms = sqrt(mean(x^2) + eps)
+y = x / rms * weight
+```
+
+相比 LayerNorm，RMSNorm 少了均值计算，结构更简单。许多 LLM 使用 RMSNorm，例如 LLaMA 系列。
+
+常见优化方向包括：
+
+- 高效计算 `sum(x^2)`
+- 使用 fp32 accumulation
+- 向量化 hidden dimension
+- residual add + RMSNorm 融合
+- 针对固定 hidden size 特化
+
+RMSNorm 是推理系统中很值得关注的归一化算子，因为它在现代 LLM 中出现频率很高。
+
+### 2.6 Activation：GELU / SiLU / ReLU
+
+Activation 用于引入非线性。常见激活函数包括：
+
+```text
+ReLU(x) = max(0, x)
+SiLU(x) = x * sigmoid(x)
+GELU(x) ~= x * Phi(x)
+```
+
+它们通常出现在 MLP / FFN 中：
+
+```text
+Linear -> Activation -> Linear
+```
+
+在 LLaMA 等模型中，还常见 SwiGLU 结构，其核心包括 SiLU 相关计算。
+
+Activation 通常是 elementwise 算子，优化重点包括：
+
+- 与 bias add 融合
+- 与 GEMM epilogue 融合
+- 使用近似公式降低 exp / tanh 成本
+- 向量化 elementwise 计算
+- 减少中间 tensor 写回
+
+Activation 本身计算不一定重，但出现频率高，且非常适合与前后的线性层或 elementwise 操作融合。
+
+### 2.7 RoPE：Rotary Position Embedding
+
+RoPE 用于向 Query 和 Key 注入位置信息。它通过对向量的偶数维和奇数维做旋转变换实现：
+
+```text
+q_even, q_odd -> rotate(q, sin, cos)
+k_even, k_odd -> rotate(k, sin, cos)
+```
+
+RoPE 通常出现在 attention 计算之前：
+
+```text
+Q, K = apply_rope(Q, K)
+score = QK^T
+```
+
+常见优化方向包括：
+
+- 预计算 sin / cos
+- 向量化偶数维和奇数维处理
+- 与 Q/K projection 融合
+- 与 attention kernel 融合
+- 减少 Q/K 中间结果写回
+
+RoPE 是 LLM 推理中很典型的 attention-specific 算子。
+
+### 2.8 Attention / FlashAttention
+
+标准 attention 计算流程是：
+
+```text
+score = QK^T / sqrt(d)
+prob = softmax(score)
+out = prob x V
+```
+
+其中包含 GEMM、scale、mask、softmax 和 GEMM。如果直接实现，可能会显式生成完整的 score 矩阵和 prob 矩阵，造成大量内存读写。
+
+FlashAttention 的核心优化思路是：
+
+- 分块计算 `QK^T`
+- 在线维护 softmax 的 max 和 sum
+- 不显式保存完整 attention score
+- 直接累积输出
+
+它的优化重点包括：
+
+- block tiling
+- online softmax
+- 减少 HBM 访问
+- causal mask 融合
+- KV cache 友好访问
+- 多 head / grouped-query attention 优化
+
+Attention 是推理优化中最核心的组合型算子之一。
+
+### 2.9 Quant / Dequant
+
+量化用于降低数据精度，从而减少存储和带宽压力：
+
+```text
+fp16 / bf16 -> int8 / int4
+```
+
+反量化则将低精度数据恢复到计算所需格式：
+
+```text
+int8 / int4 -> fp16 / fp32
+```
+
+在 LLM 推理中，常见量化方式包括：
+
+- weight-only int8 / int4
+- activation quantization
+- KV cache quantization
+
+优化方向包括：
+
+- dequant 与 GEMM 融合
+- per-channel / per-group scale 优化
+- 减少 scale / zero point 加载开销
+- 使用低精度矩阵指令
+- 平衡精度损失和吞吐提升
+
+量化相关算子对推理部署非常重要，尤其在显存容量和带宽受限时。
+
+### 2.10 Top-k / Sampling
+
+生成式推理最后需要从 logits 中选择下一个 token。常见流程包括：
+
+```text
+logits
+ -> temperature
+ -> top-k / top-p
+ -> softmax
+ -> sampling
+```
+
+这些算子出现在 decoding 阶段，每生成一个 token 都会执行。
+
+优化方向包括：
+
+- top-k 选择算法优化
+- 减少 vocabulary 维度扫描成本
+- softmax 与 sampling 融合
+- batch decoding 优化
+- 降低 CPU/GPU 同步开销
+
+虽然 sampling 不是 Transformer block 内部最重的计算，但它会影响逐 token 生成延迟。
+
+### 2.11 小结
+
+从 kernel 算子的角度看，推理优化可以理解为不同计算模式的组合优化：
+
+- elementwise：关注访存和融合
+- GEMM：关注矩阵单元和数据复用
+- reduction：关注并行归约和数值稳定
+- attention：关注分块、融合和 KV cache
+- generation：关注逐 token 延迟
+
+这些算子共同构成了模型推理的底层执行路径。理解它们的数学语义、使用位置和优化方式，是理解 AI Infra、编译器优化和后端性能调优的基础。
 
 ## 3. 我对 Triton、FlagGems 和后端的理解
 
