@@ -79,6 +79,29 @@ a {
     color: #0969da;
 }
 
+code {
+    background: #eef2f7;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 0.95em;
+    padding: 2px 5px;
+}
+
+pre {
+    background: #f1f5f9;
+    border-radius: 8px;
+    line-height: 1.5;
+    overflow-x: auto;
+    padding: 16px;
+}
+
+pre code {
+    background: transparent;
+    border-radius: 0;
+    display: block;
+    padding: 0;
+}
+
 footer {
     margin-top: 48px;
     color: #777;

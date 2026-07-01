@@ -26,7 +26,8 @@ def read_text(path: Path) -> str:
 
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    with path.open("w", encoding="utf-8", newline="\n") as file:
+        file.write(content)
 
 
 def parse_document(path: Path) -> Document:
@@ -61,6 +62,8 @@ def markdown_to_html(markdown: str) -> str:
     blocks: list[str] = []
     paragraph: list[str] = []
     list_items: list[str] = []
+    code_block: list[str] | None = None
+    code_language = ""
 
     def flush_paragraph() -> None:
         nonlocal paragraph
@@ -76,8 +79,32 @@ def markdown_to_html(markdown: str) -> str:
             blocks.append(f"<ul>\n{body}\n    </ul>")
             list_items = []
 
+    def flush_code_block() -> None:
+        nonlocal code_block, code_language
+        if code_block is not None:
+            code = "\n".join(html.escape(line) for line in code_block)
+            language = html.escape(code_language)
+            class_attr = f' class="language-{language}"' if language else ""
+            blocks.append(f"<pre><code{class_attr}>{code}</code></pre>")
+            code_block = None
+            code_language = ""
+
     for line in lines:
         stripped = line.strip()
+        if code_block is not None:
+            if stripped.startswith("```"):
+                flush_code_block()
+            else:
+                code_block.append(line.rstrip())
+            continue
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            flush_list()
+            code_language = stripped[3:].strip()
+            code_block = []
+            continue
+
         if not stripped:
             flush_paragraph()
             flush_list()
@@ -96,6 +123,7 @@ def markdown_to_html(markdown: str) -> str:
 
     flush_paragraph()
     flush_list()
+    flush_code_block()
     return "\n".join(blocks)
 
 
