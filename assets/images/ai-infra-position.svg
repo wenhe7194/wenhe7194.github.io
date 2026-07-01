@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="980" viewBox="0 0 1100 980" role="img" aria-labelledby="title desc">
+    <title id="title">通用 AI Infra 架构图</title>
+    <desc id="desc">AI Infra 位于 AI 应用、模型资产、服务框架、编译运行时和硬件资源之间，并由开发链路和工程保障能力支撑。</desc>
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#243244"/>
+        </marker>
+        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#172033" flood-opacity="0.14"/>
+        </filter>
+        <style>
+            .title { fill: #172033; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 34px; font-weight: 700; }
+            .subtitle { fill: #526173; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 17px; }
+            .layer-title { fill: #fff; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 22px; font-weight: 700; }
+            .box-title { fill: #172033; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 21px; font-weight: 700; }
+            .box-text { fill: #334155; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 16px; }
+            .small { fill: #526173; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 14px; }
+            .rail-title { fill: #172033; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 19px; font-weight: 700; }
+            .rail-text { fill: #334155; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 15px; }
+            .line { stroke: #243244; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+            .soft-line { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 7 7; }
+            .infra-boundary { fill: none; stroke: #334155; stroke-width: 2.2; stroke-dasharray: 10 8; }
+        </style>
+    </defs>
+
+    <rect width="1100" height="980" fill="#f8fafc"/>
+
+    <text class="title" x="550" y="52" text-anchor="middle">AI Infra 在整体系统中的位置</text>
+    <text class="subtitle" x="550" y="82" text-anchor="middle">它不是单个模型或单块硬件，而是让模型稳定、高效、可扩展运行的系统工程层</text>
+
+    <rect class="infra-boundary" x="52" y="200" width="996" height="705" rx="14"/>
+    <text class="rail-title" x="72" y="230">AI Infra 覆盖范围</text>
+
+    <rect x="300" y="116" width="500" height="94" rx="10" fill="#3d8bd8" filter="url(#shadow)"/>
+    <text class="layer-title" x="550" y="148" text-anchor="middle">应用与业务场景</text>
+    <text class="box-text" x="550" y="178" text-anchor="middle" fill="#fff">Chat / RAG / Agent / 搜索推荐 / 内容生成 / 内部工具</text>
+
+    <line class="line" x1="550" y1="210" x2="550" y2="260"/>
+
+    <rect x="262" y="262" width="576" height="108" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="262" y="262" width="576" height="36" rx="10" fill="#55a869"/>
+    <text class="layer-title" x="550" y="287" text-anchor="middle">模型与数据资产</text>
+    <text class="box-title" x="550" y="328" text-anchor="middle">基座模型、微调权重、Embedding、Prompt、上下文数据</text>
+    <text class="small" x="550" y="352" text-anchor="middle">回答“要运行什么模型、用什么数据和上下文”</text>
+
+    <line class="line" x1="550" y1="370" x2="550" y2="420"/>
+
+    <rect x="262" y="422" width="576" height="124" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="262" y="422" width="576" height="36" rx="10" fill="#7c6df2"/>
+    <text class="layer-title" x="550" y="447" text-anchor="middle">服务框架与在线推理层</text>
+    <text class="box-title" x="550" y="488" text-anchor="middle">模型服务、API 网关、请求路由、Batching、KV Cache</text>
+    <text class="small" x="550" y="513" text-anchor="middle">典型组件：vLLM / SGLang / TensorRT-LLM / Triton Inference Server</text>
+    <text class="small" x="550" y="535" text-anchor="middle">回答“如何把请求稳定、高吞吐、低延迟地送到模型执行”</text>
+
+    <line class="line" x1="550" y1="546" x2="550" y2="594"/>
+
+    <rect x="262" y="596" width="576" height="142" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="262" y="596" width="576" height="36" rx="10" fill="#d65a4a"/>
+    <text class="layer-title" x="550" y="621" text-anchor="middle">编译、算子库与运行时层</text>
+    <text class="box-title" x="550" y="662" text-anchor="middle">图优化 / IR / Pass / Kernel / Runtime / JIT 或 AOT</text>
+    <text class="small" x="550" y="688" text-anchor="middle">典型方向：Triton、XLA、TVM、MLIR、算子库、内存计划、调度策略</text>
+    <text class="small" x="550" y="713" text-anchor="middle">回答“如何把模型计算转换成硬件上高效执行的程序”</text>
+
+    <line class="line" x1="550" y1="738" x2="550" y2="786"/>
+
+    <rect x="262" y="788" width="576" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="262" y="788" width="576" height="36" rx="10" fill="#f0a51a"/>
+    <text class="layer-title" x="550" y="813" text-anchor="middle">硬件资源与系统平台层</text>
+    <text class="box-title" x="550" y="852" text-anchor="middle">GPU / NPU / TPU / ASIC、CPU、网络、存储、Kubernetes</text>
+    <text class="small" x="550" y="876" text-anchor="middle">回答“计算资源如何被调度、隔离、监控和高效使用”</text>
+
+    <rect x="84" y="290" width="142" height="500" rx="10" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+    <text class="rail-title" x="155" y="326" text-anchor="middle">开发链路</text>
+    <line class="soft-line" x1="226" y1="340" x2="262" y2="340"/>
+    <text class="rail-text" x="155" y="374" text-anchor="middle">数据处理</text>
+    <text class="rail-text" x="155" y="424" text-anchor="middle">训练 / 微调</text>
+    <text class="rail-text" x="155" y="474" text-anchor="middle">评测 / 对齐</text>
+    <text class="rail-text" x="155" y="524" text-anchor="middle">模型发布</text>
+    <text class="rail-text" x="155" y="574" text-anchor="middle">灰度上线</text>
+    <text class="rail-text" x="155" y="624" text-anchor="middle">回滚策略</text>
+    <text class="rail-text" x="155" y="674" text-anchor="middle">版本管理</text>
+    <text class="small" x="155" y="730" text-anchor="middle">让模型从实验</text>
+    <text class="small" x="155" y="752" text-anchor="middle">走向可维护产品</text>
+
+    <rect x="874" y="290" width="142" height="500" rx="10" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+    <text class="rail-title" x="945" y="326" text-anchor="middle">工程保障</text>
+    <line class="soft-line" x1="838" y1="470" x2="874" y2="470"/>
+    <line class="soft-line" x1="838" y1="666" x2="874" y2="666"/>
+    <text class="rail-text" x="945" y="374" text-anchor="middle">Benchmark</text>
+    <text class="rail-text" x="945" y="424" text-anchor="middle">Profiling</text>
+    <text class="rail-text" x="945" y="474" text-anchor="middle">Observability</text>
+    <text class="rail-text" x="945" y="524" text-anchor="middle">CI/CD</text>
+    <text class="rail-text" x="945" y="574" text-anchor="middle">回归测试</text>
+    <text class="rail-text" x="945" y="624" text-anchor="middle">容量规划</text>
+    <text class="rail-text" x="945" y="674" text-anchor="middle">可靠性</text>
+    <text class="rail-text" x="945" y="724" text-anchor="middle">安全与权限</text>
+
+    <rect x="230" y="928" width="640" height="34" rx="17" fill="#243244"/>
+    <text class="layer-title" x="550" y="952" text-anchor="middle">核心目标：更低延迟、更高吞吐、更低成本、更强可移植性和可维护性</text>
+</svg>

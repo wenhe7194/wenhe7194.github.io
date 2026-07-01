@@ -110,6 +110,17 @@ def markdown_to_html(markdown: str) -> str:
             flush_list()
             continue
 
+        image_match = re.fullmatch(r'!\[([^\]]*)\]\((\S+)(?:\s+"([^"]+)")?\)', stripped)
+        if image_match:
+            flush_paragraph()
+            flush_list()
+            alt, src, caption = image_match.groups()
+            alt = html.escape(alt)
+            src = html.escape(src, quote=True)
+            caption_html = f"\n    <figcaption>{markdown_inline(caption)}</figcaption>" if caption else ""
+            blocks.append(f'<figure class="post-figure">\n    <img src="{src}" alt="{alt}" loading="lazy">{caption_html}\n</figure>')
+            continue
+
         if stripped.startswith("## "):
             flush_paragraph()
             flush_list()

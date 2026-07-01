@@ -102,6 +102,26 @@ pre code {
     padding: 0;
 }
 
+.post-figure {
+    margin: 28px 0;
+}
+
+.post-figure img {
+    background: #fff;
+    border: 1px solid #d8dee8;
+    border-radius: 8px;
+    display: block;
+    height: auto;
+    max-width: 100%;
+}
+
+.post-figure figcaption {
+    color: #666;
+    font-size: 14px;
+    margin-top: 8px;
+    text-align: center;
+}
+
 footer {
     margin-top: 48px;
     color: #777;
