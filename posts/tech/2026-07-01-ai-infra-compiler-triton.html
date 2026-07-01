@@ -29,7 +29,7 @@
 <p>这篇文章先记录我目前对整体框架的阶段性理解。后续我会再围绕每个部分展开，比如 Triton kernel、典型算子、IR 转换、后端适配、profiling 和 CI 流程。</p>
 <h2>1. AI Infra 在模型推理中的位置</h2>
 <p>大模型推理表面上是在执行一个模型，但从系统角度看，它其实是大量算子的组合执行。矩阵乘法、加法、softmax、layernorm 等算子会反复出现在 Transformer 结构中。</p>
-<p>如果把应用层、模型资产、服务框架、编译运行时、硬件资源和工程保障放在一张图里，AI Infra 大致处在下面这个位置：</p>
+<p>如果把应用层、模型资产、服务框架、编译运行时和硬件资源放在一张图里，AI Infra 的核心链路大致处在下面这个位置：</p>
 <figure class="post-figure">
     <img src="/assets/images/ai-infra-position.svg" alt="AI Infra 在模型推理系统中的位置" loading="lazy">
     <figcaption>AI Infra 是连接业务应用、模型资产、推理服务、编译运行时和硬件资源的系统工程层。</figcaption>
