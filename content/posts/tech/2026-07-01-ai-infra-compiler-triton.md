@@ -3,6 +3,7 @@ title: 从 AI 编译器项目理解 AI Infra
 date: 2026-07-01
 category: tech
 category_name: 技术笔记
+routes: operator-library,team-collaboration
 summary: 记录参与 Triton 共性前端和硬件后端适配项目后，对 AI 推理系统、基础算子、IR、Pass、Adapter 和 JIT 的阶段性理解。
 ---
 

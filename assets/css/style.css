@@ -98,6 +98,26 @@ nav a:hover {
     padding-left: 20px;
 }
 
+.route-posts {
+    border-top: 1px solid #e5e7eb;
+    margin-top: 14px;
+    padding-top: 12px;
+}
+
+.route-posts h4 {
+    color: #444;
+    font-size: 15px;
+    margin: 0 0 8px;
+}
+
+.route-posts li {
+    margin-bottom: 8px;
+}
+
+.route-empty {
+    color: #777;
+}
+
 .article-list {
     padding-left: 20px;
 }
