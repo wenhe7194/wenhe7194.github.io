@@ -57,6 +57,47 @@ nav a:hover {
     margin: 28px 0 8px;
 }
 
+.route-section {
+    margin-bottom: 24px;
+}
+
+.route-section h2 {
+    margin: 0 0 10px;
+}
+
+.route-intro {
+    color: #555;
+    margin: 0 0 18px;
+}
+
+.route-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.route-branch {
+    background: #fff;
+    border: 1px solid #d8dee8;
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.route-branch h3 {
+    font-size: 18px;
+    margin: 0 0 8px;
+}
+
+.route-branch p {
+    color: #555;
+    margin: 0 0 12px;
+}
+
+.route-branch ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
 .article-list {
     padding-left: 20px;
 }

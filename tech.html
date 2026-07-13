@@ -11,7 +11,7 @@
     <div class="container">
         <header>
             <h1 class="site-title">技术笔记</h1>
-            <p class="subtitle">记录 GPU 高性能计算、密码学工程与系统性能优化相关内容。</p>
+            <p class="subtitle">记录密码工程、GPU 高性能计算、AI 算子库实现与工程管理实践。</p>
 
             <nav>
                 <a href="/">首页</a>
@@ -22,15 +22,51 @@
         </header>
 
         <main>
-<section class="card">
-    <h2>方向</h2>
-    <ul>
-        <li>GPU 高性能计算与 CUDA 编程</li>
-        <li>系统性能优化与瓶颈分析</li>
-        <li>后量子密码学工程实现</li>
-        <li>隐私计算与安全协议</li>
-        <li>C++ 工程实践与 Linux 开发环境</li>
-    </ul>
+<section class="route-section">
+    <h2>技术路线</h2>
+    <p class="route-intro">这里按长期积累方向组织技术内容。每条分支既可以沉淀单点技术，也可以逐步串成项目复盘、工程实践和方法论。</p>
+    <div class="route-grid">
+    <article class="route-branch">
+        <h3>密码工程</h3>
+        <p>关注密码算法从论文、标准到工程实现的落地过程。</p>
+        <ul>
+            <li>后量子密码学实现</li>
+            <li>隐私计算与安全协议</li>
+            <li>正确性测试与性能基准</li>
+            <li>常数时间实现与安全边界</li>
+        </ul>
+    </article>
+    <article class="route-branch">
+        <h3>GPU 高性能计算</h3>
+        <p>围绕 CUDA 编程、性能分析和硬件友好计算组织展开。</p>
+        <ul>
+            <li>CUDA kernel 编写与调优</li>
+            <li>访存合并、共享内存与并行粒度</li>
+            <li>Nsight profiling 与瓶颈分析</li>
+            <li>HPC 思路在 AI 推理中的迁移</li>
+        </ul>
+    </article>
+    <article class="route-branch">
+        <h3>算子库实现</h3>
+        <p>面向推理系统中的 AI 算子，记录 kernel 实现、算子库入口、测试和性能基准。</p>
+        <ul>
+            <li>add / GEMM / softmax / layernorm 等 AI 算子实现</li>
+            <li>Triton kernel 编写、注册与算子库集成</li>
+            <li>算子融合、量化、attention 和 KV cache 相关优化</li>
+            <li>跨后端性能对比、benchmark 与回归验证</li>
+        </ul>
+    </article>
+    <article class="route-branch">
+        <h3>团队管理与工程协作</h3>
+        <p>沉淀项目推进中的协作方式、GitHub 团队流程、质量保障和技术决策过程。</p>
+        <ul>
+            <li>任务拆解、里程碑管理与进度同步</li>
+            <li>GitHub issue / branch / pull request 协作流程</li>
+            <li>Code Review、工程规范与文档沉淀</li>
+            <li>CI 检查、回归测试、风险识别和阶段复盘</li>
+        </ul>
+    </article>
+    </div>
 </section>
 
 <section class="card">

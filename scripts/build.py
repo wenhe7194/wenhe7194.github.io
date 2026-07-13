@@ -204,6 +204,44 @@ def post_item(post: dict[str, str]) -> str:
     )
 
 
+def simple_intro_section(heading: str, items: list[str]) -> str:
+    intro_items = "\n".join(f"        <li>{html.escape(item)}</li>" for item in items)
+    return (
+        '<section class="card">\n'
+        f"    <h2>{html.escape(heading)}</h2>\n"
+        "    <ul>\n"
+        f"{intro_items}\n"
+        "    </ul>\n"
+        "</section>"
+    )
+
+
+def route_branch_item(branch: dict[str, object]) -> str:
+    items = "\n".join(f"            <li>{html.escape(item)}</li>" for item in branch["items"])
+    return (
+        '    <article class="route-branch">\n'
+        f"        <h3>{html.escape(str(branch['title']))}</h3>\n"
+        f"        <p>{html.escape(str(branch['summary']))}</p>\n"
+        "        <ul>\n"
+        f"{items}\n"
+        "        </ul>\n"
+        "    </article>"
+    )
+
+
+def route_intro_section(data: dict[str, object]) -> str:
+    branches = "\n".join(route_branch_item(branch) for branch in data["branches"])
+    return (
+        '<section class="route-section">\n'
+        f"    <h2>{html.escape(str(data['heading']))}</h2>\n"
+        f"    <p class=\"route-intro\">{html.escape(str(data['intro']))}</p>\n"
+        '    <div class="route-grid">\n'
+        f"{branches}\n"
+        "    </div>\n"
+        "</section>"
+    )
+
+
 def build_posts(site: dict[str, str], posts: list[dict[str, str]]) -> None:
     for post in posts:
         content = render_template(
@@ -223,14 +261,40 @@ def build_lists(site: dict[str, str], posts: list[dict[str, str]]) -> None:
     categories = {
         "tech": {
             "title": "技术笔记",
-            "subtitle": "记录 GPU 高性能计算、密码学工程与系统性能优化相关内容。",
-            "heading": "方向",
-            "items": [
-                "GPU 高性能计算与 CUDA 编程",
-                "系统性能优化与瓶颈分析",
-                "后量子密码学工程实现",
-                "隐私计算与安全协议",
-                "C++ 工程实践与 Linux 开发环境",
+            "subtitle": "记录密码工程、GPU 高性能计算、AI 算子库实现与工程管理实践。",
+            "heading": "技术路线",
+            "intro": "这里按长期积累方向组织技术内容。每条分支既可以沉淀单点技术，也可以逐步串成项目复盘、工程实践和方法论。",
+            "branches": [
+                {
+                    "title": "密码工程",
+                    "summary": "关注密码算法从论文、标准到工程实现的落地过程。",
+                    "items": ["后量子密码学实现", "隐私计算与安全协议", "正确性测试与性能基准", "常数时间实现与安全边界"],
+                },
+                {
+                    "title": "GPU 高性能计算",
+                    "summary": "围绕 CUDA 编程、性能分析和硬件友好计算组织展开。",
+                    "items": ["CUDA kernel 编写与调优", "访存合并、共享内存与并行粒度", "Nsight profiling 与瓶颈分析", "HPC 思路在 AI 推理中的迁移"],
+                },
+                {
+                    "title": "算子库实现",
+                    "summary": "面向推理系统中的 AI 算子，记录 kernel 实现、算子库入口、测试和性能基准。",
+                    "items": [
+                        "add / GEMM / softmax / layernorm 等 AI 算子实现",
+                        "Triton kernel 编写、注册与算子库集成",
+                        "算子融合、量化、attention 和 KV cache 相关优化",
+                        "跨后端性能对比、benchmark 与回归验证",
+                    ],
+                },
+                {
+                    "title": "团队管理与工程协作",
+                    "summary": "沉淀项目推进中的协作方式、GitHub 团队流程、质量保障和技术决策过程。",
+                    "items": [
+                        "任务拆解、里程碑管理与进度同步",
+                        "GitHub issue / branch / pull request 协作流程",
+                        "Code Review、工程规范与文档沉淀",
+                        "CI 检查、回归测试、风险识别和阶段复盘",
+                    ],
+                },
             ],
         },
         "life": {
@@ -243,11 +307,11 @@ def build_lists(site: dict[str, str], posts: list[dict[str, str]]) -> None:
 
     for category, data in categories.items():
         category_posts = [post for post in posts if post["category"] == category]
+        intro_section = route_intro_section(data) if "branches" in data else simple_intro_section(data["heading"], data["items"])
         content = render_template(
             "list.html",
             {
-                "heading": html.escape(data["heading"]),
-                "intro_items": "\n".join(f"        <li>{html.escape(item)}</li>" for item in data["items"]),
+                "intro_section": intro_section,
                 "post_items": "\n".join(post_item(post) for post in category_posts),
             },
         )
