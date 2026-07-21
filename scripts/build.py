@@ -53,8 +53,59 @@ def slug_from_post(path: Path) -> str:
 def markdown_inline(text: str) -> str:
     text = html.escape(text)
     text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+    text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
     return text
+
+
+def split_table_row(line: str) -> list[str]:
+    text = line.strip()
+    if text.startswith("|"):
+        text = text[1:]
+    if text.endswith("|"):
+        text = text[:-1]
+    return [cell.strip() for cell in text.split("|")]
+
+
+def is_table_separator(line: str) -> bool:
+    cells = split_table_row(line)
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
+
+
+def table_alignment(cell: str) -> str:
+    starts_with_colon = cell.startswith(":")
+    ends_with_colon = cell.endswith(":")
+    if starts_with_colon and ends_with_colon:
+        return "center"
+    if ends_with_colon:
+        return "right"
+    return "left"
+
+
+def markdown_table(header: list[str], separator: list[str], rows: list[list[str]]) -> str:
+    alignments = [table_alignment(cell) for cell in separator]
+    header_cells = "".join(
+        f'<th scope="col" class="table-{alignments[index]}">{markdown_inline(cell)}</th>'
+        for index, cell in enumerate(header)
+    )
+    body_rows = []
+    for row in rows:
+        cells = "".join(
+            f'<td class="table-{alignments[index]}">{markdown_inline(cell)}</td>'
+            for index, cell in enumerate(row)
+        )
+        body_rows.append(f"        <tr>{cells}</tr>")
+    body = "\n".join(body_rows)
+    return (
+        '<div class="table-wrap">\n'
+        "    <table>\n"
+        f"        <thead><tr>{header_cells}</tr></thead>\n"
+        "        <tbody>\n"
+        f"{body}\n"
+        "        </tbody>\n"
+        "    </table>\n"
+        "</div>"
+    )
 
 
 def markdown_to_html(markdown: str) -> str:
@@ -89,13 +140,16 @@ def markdown_to_html(markdown: str) -> str:
             code_block = None
             code_language = ""
 
-    for line in lines:
+    index = 0
+    while index < len(lines):
+        line = lines[index]
         stripped = line.strip()
         if code_block is not None:
             if stripped.startswith("```"):
                 flush_code_block()
             else:
                 code_block.append(line.rstrip())
+            index += 1
             continue
 
         if stripped.startswith("```"):
@@ -103,11 +157,37 @@ def markdown_to_html(markdown: str) -> str:
             flush_list()
             code_language = stripped[3:].strip()
             code_block = []
+            index += 1
             continue
 
         if not stripped:
             flush_paragraph()
             flush_list()
+            index += 1
+            continue
+
+        if (
+            "|" in stripped
+            and index + 1 < len(lines)
+            and is_table_separator(lines[index + 1].strip())
+            and len(split_table_row(stripped)) == len(split_table_row(lines[index + 1].strip()))
+        ):
+            flush_paragraph()
+            flush_list()
+            header = split_table_row(stripped)
+            separator = split_table_row(lines[index + 1].strip())
+            rows: list[list[str]] = []
+            index += 2
+            while index < len(lines):
+                row = lines[index].strip()
+                if not row or "|" not in row:
+                    break
+                cells = split_table_row(row)
+                if len(cells) != len(header):
+                    break
+                rows.append(cells)
+                index += 1
+            blocks.append(markdown_table(header, separator, rows))
             continue
 
         image_match = re.fullmatch(r'!\[([^\]]*)\]\((\S+)(?:\s+"([^"]+)")?\)', stripped)
@@ -119,6 +199,7 @@ def markdown_to_html(markdown: str) -> str:
             src = html.escape(src, quote=True)
             caption_html = f"\n    <figcaption>{markdown_inline(caption)}</figcaption>" if caption else ""
             blocks.append(f'<figure class="post-figure">\n    <img src="{src}" alt="{alt}" loading="lazy">{caption_html}\n</figure>')
+            index += 1
             continue
 
         if stripped.startswith("### "):
@@ -135,6 +216,7 @@ def markdown_to_html(markdown: str) -> str:
         else:
             flush_list()
             paragraph.append(stripped)
+        index += 1
 
     flush_paragraph()
     flush_list()

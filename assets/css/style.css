@@ -188,6 +188,43 @@ pre code {
     text-align: center;
 }
 
+.table-wrap {
+    margin: 20px 0;
+    overflow-x: auto;
+}
+
+table {
+    border-collapse: collapse;
+    font-size: 15px;
+    min-width: 620px;
+    width: 100%;
+}
+
+th,
+td {
+    border: 1px solid #d8dee8;
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: #f1f5f9;
+    font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+    background: #fafcff;
+}
+
+.table-center {
+    text-align: center;
+}
+
+.table-right {
+    text-align: right;
+}
+
 footer {
     margin-top: 48px;
     color: #777;

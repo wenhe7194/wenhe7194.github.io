@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密码工程：从安全目标到系统落地 - Wenhe 的博客</title>
+    <meta name="description" content="记录技术学习、科研实践、读书笔记和日常思考。">
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="site-title">密码工程：从安全目标到系统落地</h1>
+            <p class="subtitle">发布时间：2026-07-21</p>
+
+            <nav>
+                <a href="/">首页</a>
+                <a href="/tech.html">技术笔记</a>
+                <a href="/life.html">生活随笔</a>
+                <a href="/about.html">关于我</a>
+            </nav>
+        </header>
+
+        <main>
+<article class="card">
+    <p class="post-meta">发布时间：2026-07-21 · <a href="/tech.html">技术笔记</a></p>
+<p>密码工程不是“选一个加密算法并调用 API”。它关注的是：在明确攻击者能力和业务约束的前提下，把密码学原语、密钥、实现、测试、部署与应急流程组合成一个长期可靠的系统。</p>
+<p>这篇文章用一条工程链路整理密码工程的核心问题：安全目标决定要保护什么，威胁模型决定要防谁，原语与协议给出密码学方案，之后仍要通过密钥管理、安全实现、验证、性能优化和运维，才能把方案真正落地。</p>
+<h2>1. 从安全目标开始</h2>
+<p>安全目标不能只写“使用加密”。不同目标对应不同的安全性质和工程机制，缺少其中任何一项都可能造成系统层面的误用。</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">安全目标</th><th scope="col" class="table-left">要解决的问题</th><th scope="col" class="table-left">常见工程机制</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left"><strong>机密性</strong></td><td class="table-left">未授权者不能读取数据内容</td><td class="table-left">对称加密、公钥加密、KEM</td></tr>
+        <tr><td class="table-left"><strong>完整性</strong></td><td class="table-left">数据传输或存储过程中不能被悄悄篡改</td><td class="table-left">MAC、AEAD、数字签名</td></tr>
+        <tr><td class="table-left"><strong>身份认证</strong></td><td class="table-left">能够确认通信或操作的主体</td><td class="table-left">MAC、数字签名、证书</td></tr>
+        <tr><td class="table-left"><strong>不可否认性</strong></td><td class="table-left">签名者不能在事后否认已签署的内容</td><td class="table-left">数字签名与证书体系</td></tr>
+        <tr><td class="table-left"><strong>密钥协商</strong></td><td class="table-left">双方安全建立共享会话密钥</td><td class="table-left">ECDH、ML-KEM、混合 KEM</td></tr>
+        <tr><td class="table-left"><strong>前向安全</strong></td><td class="table-left">长期密钥泄露后，历史会话尽量不受影响</td><td class="table-left">临时密钥交换与会话密钥轮换</td></tr>
+        <tr><td class="table-left"><strong>访问控制</strong></td><td class="table-left">约束谁能使用密钥、签名、解密或导出</td><td class="table-left">KMS、HSM、权限与审计系统</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>例如，单纯加密并不能证明消息来自谁，也不能自动防止篡改。工程设计应先写清楚需要保护的对象、允许谁操作、泄露后的影响范围，再选择相应机制。</p>
+<h2>2. 威胁模型决定方案边界</h2>
+<p>同一套算法放到不同系统里，面对的攻击面并不相同。威胁模型需要明确资产、攻击者能力、信任边界，以及系统可以接受的性能和可用性代价。</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">场景</th><th scope="col" class="table-left">主要关注的风险</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left">离线性能基准</td><td class="table-left">正确性、吞吐、资源利用与可复现性</td></tr>
+        <tr><td class="table-left">服务端批量签名</td><td class="table-left">私钥保护、随机数质量、并发安全与审计</td></tr>
+        <tr><td class="table-left">嵌入式设备签名</td><td class="table-left">侧信道、故障攻击、受限内存与密钥提取</td></tr>
+        <tr><td class="table-left">车联网固件签名</td><td class="table-left">私钥生命周期、签名链、证书管理与撤销</td></tr>
+        <tr><td class="table-left">云端 HSM / KMS</td><td class="table-left">访问控制、操作审计、租户隔离与密钥不可导出</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>离线 benchmark 只说明实现的正确性和性能，不能证明它已经具备生产系统所需的密钥保护、访问控制或应急能力。密码工程的关键是让保护目标与真实攻击面相匹配。</p>
+<h2>3. 用标准原语和协议完成目标</h2>
+<p>原语选择应从目标与威胁模型反推，并优先使用经过标准化、充分分析和长期维护的方案。工程重点不是重新设计密码算法，而是让原语在正确的协议、参数和生命周期中被正确使用。</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">工程诉求</th><th scope="col" class="table-left">常见组合</th><th scope="col" class="table-left">需要避免的误用</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left">数据机密性与完整性</td><td class="table-left">AEAD 加密</td><td class="table-left">只加密不认证；使用 ECB；自行拼接加密模式</td></tr>
+        <tr><td class="table-left">请求完整性与认证</td><td class="table-left">MAC 或数字签名</td><td class="table-left">把“加密成功”误认为“身份可信”</td></tr>
+        <tr><td class="table-left">对第三方证明签署行为</td><td class="table-left">数字签名与证书</td><td class="table-left">用 HMAC 替代数字签名；共享密钥无法向第三方证明签署主体</td></tr>
+        <tr><td class="table-left">建立会话密钥</td><td class="table-left">密钥交换或 KEM，再经 KDF 派生</td><td class="table-left">直接用公钥算法处理大批量数据；缺少身份认证</td></tr>
+        <tr><td class="table-left">多用途密钥隔离</td><td class="table-left">KDF 与明确的上下文标签</td><td class="table-left">一个密钥在加密、认证、签名等场景重复使用</td></tr>
+        <tr><td class="table-left">口令保存</td><td class="table-left">专用口令哈希 / KDF</td><td class="table-left">明文保存；可逆加密；直接保存 <code>SHA256(password)</code></td></tr>
+        <tr><td class="table-left">防止消息重放</td><td class="table-left">nonce、序列号、时间戳与协议状态机</td><td class="table-left">只验签，不检查消息新鲜性和顺序</td></tr>
+        <tr><td class="table-left">多方隐私计算</td><td class="table-left">安全多方计算、同态加密或可信执行环境</td><td class="table-left">把静态数据加密误解为可以直接进行安全计算</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>参数、编码格式和版本同样是协议的一部分。即使选择了正确的算法，错误的 nonce 使用、版本协商或序列化方式也会破坏整体安全性。</p>
+<h2>4. 密钥与随机数是系统的核心资产</h2>
+<p>密码系统最终保护的往往不是某段密文，而是密钥本身。密钥管理需要覆盖完整生命周期：</p>
+<p>生成 → 存储 → 使用 → 轮换 → 备份 → 撤销 → 销毁 → 泄露应急</p>
+<ul>
+        <li>使用可信的 CSPRNG 生成密钥、随机值和签名所需随机数，并明确 seed 的来源与状态管理。</li>
+        <li>按用途隔离密钥。主密钥、会话密钥、加密密钥和认证密钥应通过清晰的密钥层级或 KDF 分域管理。</li>
+        <li>私钥不应进入配置文件、日志、镜像或 Git 仓库；需要时应借助 KMS、HSM 或系统级密钥保护能力。</li>
+        <li>为轮换、撤销和泄露预先设计兼容策略。密钥泄露发生后，系统应能停止高风险操作、替换密钥、追溯影响范围并恢复服务。</li>
+    </ul>
+<h2>5. 安全实现：算法正确不等于实现安全</h2>
+<p>一个数学上安全的算法，也可能因实现细节而泄露秘密或在异常输入下失效。实现阶段应优先复用经过审查的密码库，并把安全边界作为代码质量的一部分。</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">实现问题</th><th scope="col" class="table-left">风险与工程要求</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left">与秘密相关的分支</td><td class="table-left">分支路径和执行时间可能泄露秘密；敏感路径应尽量采用常数时间实现</td></tr>
+        <tr><td class="table-left">与秘密相关的内存访问</td><td class="table-left">cache 行为可能泄露访问模式；避免由秘密决定表查找或访问位置</td></tr>
+        <tr><td class="table-left">随机数失效</td><td class="table-left">密钥生成和随机化签名可能直接失去安全性；需要可靠的随机源与失败处理</td></tr>
+        <tr><td class="table-left">错误信息过多</td><td class="table-left">错误路径可能暴露内部状态；对外错误信息应稳定、最小化且不含敏感值</td></tr>
+        <tr><td class="table-left">敏感内存残留</td><td class="table-left">私钥和中间值在内存中停留过久会扩大暴露面；应减少副本并及时清理</td></tr>
+        <tr><td class="table-left">并行与共享状态</td><td class="table-left">多线程或 GPU 多流可能造成 race condition、nonce 重用或状态污染；需要明确所有权和同步边界</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>常数时间并不是一个可以脱离环境的标签。编译器优化、硬件特征和运行时行为都可能影响侧信道风险，因此需要对关键路径持续审查和测试。</p>
+<h2>6. 正确性验证应形成闭环</h2>
+<p>密码实现不能只依赖一次单元测试。验证需要覆盖规范一致性、边界输入、不同实现之间的一致性，以及每次性能优化后的回归。</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">方法</th><th scope="col" class="table-left">作用</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left"><strong>KAT / Known Answer Test</strong></td><td class="table-left">使用官方测试向量验证实现是否符合规范</td></tr>
+        <tr><td class="table-left"><strong>参考实现对齐</strong></td><td class="table-left">将输出与可信参考实现进行比对</td></tr>
+        <tr><td class="table-left"><strong>随机测试</strong></td><td class="table-left">用大量随机输入检查实现的一致性与稳定性</td></tr>
+        <tr><td class="table-left"><strong>边界测试</strong></td><td class="table-left">覆盖极小、极大、空值、异常长度等输入</td></tr>
+        <tr><td class="table-left"><strong>差分测试</strong></td><td class="table-left">在多个独立实现之间交叉比较结果</td></tr>
+        <tr><td class="table-left"><strong>Fuzzing</strong></td><td class="table-left">自动构造异常输入，发现解析、状态机和内存类问题</td></tr>
+        <tr><td class="table-left"><strong>回归测试</strong></td><td class="table-left">每次优化、重构或依赖升级后重复验证</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>对于标准算法，测试向量是最基础的门槛；对于协议和服务系统，还需要测试错误路径、状态转换、权限边界和迁移兼容性。</p>
+<h2>7. 性能优化必须以安全与正确性为前提</h2>
+<p>高性能密码实现通常需要关注算法结构、并行粒度、访存和异步执行，但优化顺序不应跳过验证：</p>
+<p>定位瓶颈 → 算法级重构 → 并行粒度设计 → 访存优化 → 异步并发 → profiling 验证 → benchmark 对比</p>
+<p>每一个性能改动都应回答三个问题：结果是否仍与规范一致，是否引入新的侧信道或并发风险，性能提升是否能被可复现的 benchmark 证明。特别是在 GPU 或其他并行硬件上，吞吐优化、随机数状态和共享内存访问需要一起评估。</p>
+<h2>8. 系统集成、运维与应急</h2>
+<p>密码库只有进入真实系统后，才会面对 API 误用、编码兼容、权限分配、日志审计和版本迁移等问题。以下边界需要在集成设计中明确：</p>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th scope="col" class="table-left">集成边界</th><th scope="col" class="table-left">需要明确的内容</th><th scope="col" class="table-left">典型风险</th></tr></thead>
+        <tbody>
+        <tr><td class="table-left">API 与数据格式</td><td class="table-left"><code>keygen</code>、<code>sign</code>、<code>verify</code>、<code>encaps</code>、<code>decaps</code> 等接口语义；输入输出长度、字节序与版本</td><td class="table-left">接口误用、序列化不兼容</td></tr>
+        <tr><td class="table-left">密钥操作与权限</td><td class="table-left">谁能签名、解密、导出、轮换和撤销密钥；如何记录操作</td><td class="table-left">越权调用、内部滥用、密钥落盘</td></tr>
+        <tr><td class="table-left">随机数、nonce 与并发</td><td class="table-left">唯一性要求、状态所有权、多线程 / 多流同步方式</td><td class="table-left">nonce 重用、race condition</td></tr>
+        <tr><td class="table-left">协议状态与错误处理</td><td class="table-left">消息顺序、重放检查、防降级，以及对外错误信息</td><td class="table-left">replay / downgrade attack、信息泄露</td></tr>
+        <tr><td class="table-left">日志、审计与监控</td><td class="table-left">记录哪些操作、哪些数据绝不记录、异常如何告警和追溯</td><td class="table-left">私钥、明文或敏感中间值进入日志</td></tr>
+        <tr><td class="table-left">兼容迁移与测试</td><td class="table-left">新旧算法或密钥并存策略、回滚方案和回归验证</td><td class="table-left">迁移中断、旧数据不可解密、旧签名失效</td></tr>
+        </tbody>
+    </table>
+</div>
+<p>部署完成不是终点。面对漏洞披露、密钥泄露、依赖更新或算法迁移，系统需要有明确的监控、告警、轮换、撤销和恢复流程。这样，密码学能力才真正成为可维护的工程能力。</p>
+<h2>小结</h2>
+<p>密码工程的价值，在于把“算法安全”扩展为“系统在真实环境中仍然安全”。一条完整链路需要同时回答：保护什么、对抗谁、使用什么原语、如何管理密钥、如何实现和验证、如何衡量性能，以及在出错和变化时如何继续运行。</p>
+<p>后续可以沿着这条链路继续展开，例如后量子密码算法实现、常数时间优化、GPU 并行实现、KAT 与差分测试、以及密钥管理和 CI 流程的工程实践。</p>
+</article>
+
+        </main>
+
+        <footer>
+            <p>© 2026 Wenhe. Powered by GitHub Pages.</p>
+        </footer>
+    </div>
+</body>
+</html>
